@@ -3,6 +3,8 @@ package optic_fusion1.servercinematics.command;
 import email.com.gmail.cosmoconsole.bukkit.camera.ServerCinematics;
 import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent;
 import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent;
+import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
+import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
 import optic_fusion1.servercinematics.util.Utils;
 import static optic_fusion1.servercinematics.util.Utils.clipList;
 import static optic_fusion1.servercinematics.util.Utils.sendMultilineMessage;
@@ -30,8 +32,6 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 public class CameraCommand implements CommandExecutor, TabCompleter {
-    private static final String SHORT_PREFIX = Utils.colorize("&7[&8&l[**]<|&7] ");
-    private static final String LONG_PREFIX = Utils.colorize("&7[&8&l[**]<|&eServer&6Cinematics&7]&7] &c");
     private static final String HELP_STRING = """
             &c&l[**]<|&0Server&6Cimematics &fby Optic_Fusion1, CosmoConsole, Misko, Pietu1998
             /### help - Display this message
@@ -75,7 +75,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 1) {
-            sender.sendMessage(Utils.colorize("&8*l[**]<|&eServer&6Cimematics &fby Optic_Fusion1, CosmoConsole, Kisko, Pietu1998, &aVersion: " + plugin.getDescription().getVersion()));
+            sender.sendMessage(Utils.colorize(LONG_PREFIX + "&fby Optic_Fusion1, CosmoConsole, Kisko, Pietu1998, &aVersion: " + plugin.getDescription().getVersion()));
             sender.sendMessage(Utils.colorize("&7See \"/cam help\" for help."));
             return true;
         }
@@ -108,7 +108,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
         if (!hasPermission(sender, "servercinematics.edit")) {
             return;
         }
-        sender.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|]" : "&7[&8&l[**]<|&eServer&6Cinematics&7] &aList of waypoints in your path:")));
+        sender.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&aList of waypoints in your path:"));
         int n = 0;
         List<Double> safeWaypointYaw = plugin.getSafeWaypointYaw(sender);
         List<Double> safeWaypointPitch = plugin.getSafeWaypointPitch(sender);
@@ -118,7 +118,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Utils.colorize("&e" + n + "&7: &f" + location.getBlockX() + "," + location.getBlockZ() + ":" + ((yaw > 400.0) ? "-" : String.format(Locale.ENGLISH, "%.1f", yaw)) + "," + ((pitch > 400.0) ? "-" : String.format(Locale.ENGLISH, "%.1f", pitch))));
         }
         if (n == 0) {
-            sender.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&8&l[**]<|&eServer&6Cinematics&7] &cNone at all!")));
+            sender.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cNone at all!"));
         }
     }
 
@@ -127,14 +127,14 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (plugin.isInGlobalMode()) {
-            sender.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&8&l[**]<|&eServer&6Cinematics&7] &cYou can't use this.")));
+            sender.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cYou can't use this."));
             return;
         }
     }
 
     private boolean hasPermission(CommandSender sender, String permission) {
         if (!sender.hasPermission(permission)) {
-            sender.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&8l[**]<|&eServer&6Cinematics]") + "&cYou can't use this."));
+            sender.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cYou can't use this."));
             return false;
         }
         return true;

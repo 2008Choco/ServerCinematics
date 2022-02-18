@@ -10,6 +10,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
+import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -464,6 +466,10 @@ public class ServerCinematics extends JavaPlugin {
                 return String.format("(%+7.3f,%+7.3f,%+7.3f)", l.getX(), l.getY(), l.getZ());
             }
             */
+
+            // &7[&8&l[**]<|&eServer&6Cinematics&7]&7] &c
+            // &7[&7&l[**]<|&eServer&6Cinematics&7]] &c
+
             @Override
             public void run() {
                 if (this.w.size() <= 0) {
@@ -731,7 +737,7 @@ public class ServerCinematics extends JavaPlugin {
                 if (this.i >= this.w.size() || this.end || this.w.size() < 1) {
                     // reached the end of the path!
                     if (!pl_playing.get(u) && !fplay && owner != null) {
-                        owner.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &cEnd of path reached.")));
+                        owner.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cEnd of path reached."));
                     }
                     // record new duration of this path
                     waypoints_t.put(this.u, this.ticks_moved * (0.05D * M));
@@ -838,7 +844,7 @@ public class ServerCinematics extends JavaPlugin {
                                 }
                                 if (this.i >= this.wtemp.size()) {
                                     if (!pl_playing.get(u) && !fplay && owner != null) {
-                                        owner.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &cEnd of path reached.")));
+                                        owner.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cEnd of path reached."));
                                     }
                                     waypoints_t.put(this.u, this.ticks_moved * (0.05D * M));
                                     if (this.w.size() > 0)
@@ -1087,7 +1093,7 @@ public class ServerCinematics extends JavaPlugin {
                             return;
                         }
                         if (owner != null) {
-                            owner.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &cAn error occurred during play. See the console.")));
+                            owner.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cAn error occurred during play. See the console."));
                         }
                         this.cancel();
                         if (!isInGlobalMode) stop(this.p, PathPlaybackStoppedEvent.StopCause.FINISHED);
@@ -1440,9 +1446,9 @@ public class ServerCinematics extends JavaPlugin {
         if (pl_playing.get(uniqueId)) {
             if (!this.findNextSuitablePath(player)) {
                 if (pl_looping.get(uniqueId)) {
-                    player.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &cNo more playable paths found.")));
+                    player.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cNo more playable paths found."));
                 } else {
-                    player.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &cEnd of playlist.")));
+                    player.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "&cEnd of playlist."));
                 }
                 return;
             }

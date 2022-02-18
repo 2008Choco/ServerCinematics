@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>optic_fusion1</groupId>
     <artifactId>ServerCinematics</artifactId>
-    <version>2.3</version>
+    <version>2.4</version>
     <packaging>jar</packaging>
 
     <repositories>
@@ -28,7 +28,7 @@
                 <configuration>
                     <archive>
                         <manifestEntries>
-                            <Built-By></Built-By>
+                            <Built-By/>
                         </manifestEntries>
                         <addMavenDescriptor>false</addMavenDescriptor>
                     </archive>
