@@ -1,11 +1,23 @@
 package optic_fusion1.servercinematics.cinematic;
 
+import com.google.common.base.Enums;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Lists;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 
+import java.lang.reflect.Type;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +28,8 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
 public class CinematicPath implements Cloneable, Iterable<CinematicKeyframe> {
+
+    public static final CinematicPath.Serializer SERIALIZER = new Serializer();
 
     private final String id;
     private final UUID ownerUUID;
@@ -174,6 +188,11 @@ public class CinematicPath implements Cloneable, Iterable<CinematicKeyframe> {
             return this;
         }
 
+        public Builder keyframes(CinematicKeyframe... keyframes) {
+            Collections.addAll(this.keyframes, keyframes);
+            return this;
+        }
+
         public Builder completion(CinematicCompletion completion) {
             this.completion = completion;
             return this;
@@ -186,6 +205,85 @@ public class CinematicPath implements Cloneable, Iterable<CinematicKeyframe> {
 
         public CinematicPath build() {
             return new CinematicPath(id, ownerUUID, creationDate, keyframes.toArray(CinematicKeyframe[]::new), completion, playerFreelookAllowed);
+        }
+
+    }
+
+    private static final class Serializer implements JsonSerializer<CinematicPath>, JsonDeserializer<CinematicPath> {
+
+        @Override
+        public JsonElement serialize(CinematicPath path, Type type, JsonSerializationContext context) {
+            JsonObject object = new JsonObject();
+
+            object.addProperty("id", path.id);
+
+            if (path.ownerUUID != null) {
+                object.addProperty("ownerUUID", path.ownerUUID.toString());
+            }
+
+            object.addProperty("creationDate", path.creationDate.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            object.addProperty("completion", path.completion.name());
+            object.addProperty("freelookAllowed", path.playerFreelookAllowed);
+
+            // Keyframes
+            JsonArray keyframesArray = new JsonArray();
+
+            for (CinematicKeyframe keyframe : path.keyframes) {
+                JsonElement keyframeElement = context.serialize(keyframe);
+                if (keyframeElement.isJsonObject()) {
+                    continue;
+                }
+
+                keyframesArray.add(keyframeElement);
+            }
+
+            object.add("keyframes", keyframesArray);
+
+            return object;
+        }
+
+        @Override
+        public CinematicPath deserialize(JsonElement element, Type type, JsonDeserializationContext context) throws JsonParseException {
+            if (!element.isJsonObject()) {
+                throw new JsonParseException("Expected JsonObject (root), got " + element.getClass().getSimpleName());
+            }
+
+            JsonObject object = element.getAsJsonObject();
+
+            String id = object.get("id").getAsString();
+            UUID ownerUUID = object.has("ownerUUID") ? UUID.fromString(object.get("ownerUUID").getAsString()) : null;
+            LocalDateTime creationDate = LocalDateTime.parse(object.get("creationDate").getAsString());
+
+            CinematicCompletion completion = Enums.getIfPresent(CinematicCompletion.class, object.get("completion").getAsString()).or(CinematicCompletion.TELEPORT_BACK);
+            boolean freelookAllowed = object.get("freelookAllowed").getAsBoolean();
+
+            JsonArray keyframesArray = object.getAsJsonArray("keyframes");
+            CinematicKeyframe[] keyframes = new CinematicKeyframe[keyframesArray.size()];
+
+            for (int i = 0; i < keyframes.length; i++) {
+                JsonElement keyframeElement = keyframesArray.get(i);
+                if (!keyframeElement.isJsonObject()) {
+                    throw new JsonParseException("Expected JsonObject (keyframe index " + i + "), got " + element.getClass().getSimpleName());
+                }
+
+                JsonObject keyframeObject = keyframeElement.getAsJsonObject();
+                String keyframeTypeId = keyframeObject.get("type").getAsString();
+                Type keyframeType = AbstractKeyframe.getSerializableType(keyframeTypeId);
+
+                if (keyframeType == null) {
+                    throw new JsonParseException("Unexpected keyframe type (keyframe index " + i + "), got \"" + keyframeTypeId + "\"");
+                }
+
+                keyframes[i] = context.deserialize(keyframeObject, type);
+            }
+
+            return CinematicPath.builder(id)
+                    .owner(ownerUUID)
+                    .creationDate(creationDate)
+                    .completion(completion)
+                    .playerFreelook(freelookAllowed)
+                    .keyframes(keyframes)
+                    .build();
         }
 
     }

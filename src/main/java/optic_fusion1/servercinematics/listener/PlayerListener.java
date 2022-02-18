@@ -1,13 +1,8 @@
 package optic_fusion1.servercinematics.listener;
 
-import email.com.gmail.cosmoconsole.bukkit.camera.ServerCinematics;
-import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent;
-import optic_fusion1.servercinematics.user.User;
-import optic_fusion1.servercinematics.user.UserManager;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -19,14 +14,16 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.util.Vector;
 
-import java.util.Locale;
+import optic_fusion1.servercinematics.ServerCinematicsPlugin;
+import optic_fusion1.servercinematics.user.User;
+import optic_fusion1.servercinematics.user.UserManager;
 
 public class PlayerListener implements Listener {
 
     private UserManager userManager;
-    private ServerCinematics plugin;
+    private ServerCinematicsPlugin plugin;
 
-    public PlayerListener(ServerCinematics plugin) {
+    public PlayerListener(ServerCinematicsPlugin plugin) {
         userManager = plugin.getUserManager();
         this.plugin = plugin;
     }
@@ -60,7 +57,8 @@ public class PlayerListener implements Listener {
             return;
         }
         if (user.isPlaying()) {
-            plugin.stop(player, PathPlaybackStoppedEvent.StopCause.LEFT);
+            // TODO: Reimplement
+            // plugin.stop(player, PathPlaybackStoppedEvent.StopCause.LEFT);
         }
     }
 

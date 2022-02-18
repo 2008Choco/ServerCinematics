@@ -1,35 +1,21 @@
 package optic_fusion1.servercinematics.command;
 
-import email.com.gmail.cosmoconsole.bukkit.camera.ServerCinematics;
-import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent;
-import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent;
-import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
-import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
-import optic_fusion1.servercinematics.util.Utils;
-import static optic_fusion1.servercinematics.util.Utils.clipList;
-import static optic_fusion1.servercinematics.util.Utils.sendMultilineMessage;
-import static org.bukkit.Bukkit.getServer;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Server;
-import org.bukkit.World;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.util.Vector;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
-import java.util.regex.Pattern;
+import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
+import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
+import static optic_fusion1.servercinematics.util.Utils.clipList;
+import static org.bukkit.Bukkit.getServer;
+
+import optic_fusion1.servercinematics.ServerCinematicsPlugin;
+import optic_fusion1.servercinematics.util.Utils;
 
 public class CameraCommand implements CommandExecutor, TabCompleter {
     private static final String HELP_STRING = """
@@ -64,12 +50,12 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             /### stop - Stop playing
             /### reload - Reload configuration";
             """;
-    private ServerCinematics plugin;
+    private ServerCinematicsPlugin plugin;
     private boolean shortPrefix;
 
-    public CameraCommand(ServerCinematics plugin) {
+    public CameraCommand(ServerCinematicsPlugin plugin) {
         this.plugin = plugin;
-        this.shortPrefix = plugin.shouldUseShortPrefix();
+        this.shortPrefix = plugin.isShortPrefix();
     }
 
     @Override
@@ -84,6 +70,8 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Utils.colorize((shortPrefix ? SHORT_PREFIX : LONG_PREFIX) + "Only players can use this command."));
             return true;
         }
+
+        /*
         Player player = (Player) sender;
         plugin.getSafeWaypointDelays(player);
         plugin.getSafeWaypointOptions(player);
@@ -101,9 +89,12 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             handleDelay(sender, args);
             return true;
         }
+        */
+
         return true;
     }
 
+    /*
     private void handleList(CommandSender sender) {
         if (!hasPermission(sender, "servercinematics.edit")) {
             return;
@@ -131,6 +122,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
             return;
         }
     }
+    */
 
     private boolean hasPermission(CommandSender sender, String permission) {
         if (!sender.hasPermission(permission)) {
@@ -4228,6 +4220,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
                         || args[0].equalsIgnoreCase("cmd")
                         || args[0].equalsIgnoreCase("msg")) {
                     returnEmpty = true;
+                    /* TODO: Reimplement
                     int maxLen = plugin.getSafeWaypoints(sender).size();
                     for (int i = 0; i < maxLen; ++i) {
                         String n = Integer.toString(i);
@@ -4235,6 +4228,7 @@ public class CameraCommand implements CommandExecutor, TabCompleter {
                             suggestions.add(n);
                         }
                     }
+                    */
                 } else if (args[0].equalsIgnoreCase("fclear")
                         || args[0].equalsIgnoreCase("fload")
                         || args[0].equalsIgnoreCase("fplay")

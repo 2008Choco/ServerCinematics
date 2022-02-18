@@ -13,6 +13,10 @@ local.properties
 # External tool builders
 .externalToolBuilders/
 
+# Eclipse
+.classpath
+.project
+
 # Locally stored "Eclipse launch configurations"
 *.launch
 
@@ -59,3 +63,4 @@ local.properties
 # Typically, this file would be tracked if it contains build/dependency configurations:
 #.project
 
+/target/

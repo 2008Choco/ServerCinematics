@@ -10,8 +10,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
-import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -24,6 +22,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+
+import static optic_fusion1.servercinematics.util.Constant.LONG_PREFIX;
+import static optic_fusion1.servercinematics.util.Constant.SHORT_PREFIX;
 
 import optic_fusion1.servercinematics.cinematic.CinematicManager;
 import optic_fusion1.servercinematics.command.CameraCommand;
@@ -1572,25 +1573,27 @@ public class ServerCinematics extends JavaPlugin {
             final List<Double> safeWaypointPitch9 = this.getSafeWaypointPitch(u);
             final List<String> safeWaypointMessages3 = this.getSafeWaypointMessages(u);
             final List<List<String>> safeWaypointCommands3 = this.getSafeWaypointCommands(u);
+
             //final World world3 = player4.getWorld();
-            final String s9 = s8.split("#")[0];
+            final String coordinateComponentString = s8.split("#")[0];
             final String s10 = s8.split("#")[1];
-            final float float3 = Float.parseFloat(s9.split(",")[2]);
-            final float float4 = Float.parseFloat(s9.split(",")[3]);
+
+            final float float3 = Float.parseFloat(coordinateComponentString.split(",")[2]);
+            final float float4 = Float.parseFloat(coordinateComponentString.split(",")[3]);
             int n12 = 0;
             int safeFlags2 = 0;
             ServerCinematics.pathnames.put(u, string);
-            if (s9.split(",").length > 4) {
-                safeFlags2 = Integer.parseInt(s9.split(",")[4]);
+            if (coordinateComponentString.split(",").length > 4) {
+                safeFlags2 = Integer.parseInt(coordinateComponentString.split(",")[4]);
             }
-            if (Bukkit.getServer().getWorld(s9.split(",")[0]) == null) {
+            if (Bukkit.getServer().getWorld(coordinateComponentString.split(",")[0]) == null) {
                 return -1;
             }
             double safeTime = -1;
-            if (s9.split(",").length > 5) {
-                safeTime = Double.parseDouble(s9.split(",")[5]);
+            if (coordinateComponentString.split(",").length > 5) {
+                safeTime = Double.parseDouble(coordinateComponentString.split(",")[5]);
             }
-            final World aworld = Bukkit.getServer().getWorld(s9.split(",")[0]);
+            final World aworld = Bukkit.getServer().getWorld(coordinateComponentString.split(",")[0]);
             String[] split6;
             for (int length4 = (split6 = s10.split(Pattern.quote("|"))).length, n13 = 0; n13 < length4; ++n13) {
                 final String s11 = split6[n13];
@@ -1679,10 +1682,10 @@ public class ServerCinematics extends JavaPlugin {
             ServerCinematics.waypoints_c.put(u, safeWaypointCommands3);
             ServerCinematics.waypoints_f.put(u, safeFlags2);
             ServerCinematics.waypoints_t.put(u, safeTime);
-            ServerCinematics.speed.put(u, Double.parseDouble(s9.split(",")[1]));
+            ServerCinematics.speed.put(u, Double.parseDouble(coordinateComponentString.split(",")[1]));
             if (safeWaypoints7.size() == 0)
                 return 0;
-            lastWorld = s9.split(",")[0];
+            lastWorld = coordinateComponentString.split(",")[0];
             return n12 - n11;
         }
         catch (Exception ex) {
