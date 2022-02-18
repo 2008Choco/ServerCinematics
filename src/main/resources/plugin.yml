@@ -1,10 +1,10 @@
 name: ServerCinematics
 main: email.com.gmail.cosmoconsole.bukkit.camera.ServerCinematics
-version: 1.16
+version: ${project.version}
 api-version: 1.13
 description: Acts as a server-side replacement for Camera Studio Mod.
 author: CosmoConsole
-authors: [Kisko, Pietu1998]
+authors: [2008Choco, Optic_Fusion1, Kisko, Pietu1998]
 commands:
    camera:
       aliases: [cam]
