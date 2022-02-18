@@ -1,15 +1,17 @@
 package optic_fusion1.servercinematics.user;
 
+import java.util.UUID;
+
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
-import java.util.UUID;
+import optic_fusion1.servercinematics.cinematic.CinematicPath;
 
 public class User {
 
     private UUID uniqueID;
     private boolean isPlaying;
-    private String pathName;
+    private CinematicPath currentPath;
     private boolean isPathless;
     private boolean isInTpMode;
 
@@ -33,12 +35,12 @@ public class User {
         return Bukkit.getPlayer(uniqueID);
     }
 
-    public String getPathName() {
-        return pathName;
+    public void setCurrentPath(CinematicPath currentPath) {
+        this.currentPath = currentPath;
     }
 
-    public void setPathName(String name) {
-        this.pathName = name;
+    public CinematicPath getCurrentPath() {
+        return currentPath;
     }
 
     public boolean isPathless() {

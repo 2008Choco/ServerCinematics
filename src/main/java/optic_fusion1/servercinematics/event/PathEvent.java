@@ -4,14 +4,16 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
-public class PathEvent extends Event {
+import optic_fusion1.servercinematics.cinematic.CinematicPath;
+
+public abstract class PathEvent extends Event {
 
     private static final HandlerList HANDLERS = new HandlerList();
     private Player player;
-    private String path;
+    private CinematicPath path;
     private long id;
 
-    public PathEvent(Player player, String path, long id) {
+    public PathEvent(Player player, CinematicPath path, long id) {
         this.player = player;
         this.path = path;
         this.id = id;
@@ -21,7 +23,7 @@ public class PathEvent extends Event {
         return player;
     }
 
-    public String getPath() {
+    public CinematicPath getPath() {
         return path;
     }
 

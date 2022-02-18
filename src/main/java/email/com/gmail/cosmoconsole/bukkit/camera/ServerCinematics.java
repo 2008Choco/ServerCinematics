@@ -1,52 +1,44 @@
 package email.com.gmail.cosmoconsole.bukkit.camera;
 
-import optic_fusion1.servercinematics.command.CameraCommand;
-import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent;
-import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent;
-import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent.StopCause;
-import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent.StartCause;
-import optic_fusion1.servercinematics.event.WaypointReachedEvent;
-import optic_fusion1.servercinematics.listener.PlayerListener;
-import optic_fusion1.servercinematics.user.User;
-import optic_fusion1.servercinematics.user.UserManager;
-import optic_fusion1.servercinematics.util.Utils;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.GameMode;
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.command.PluginCommand;
-import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.event.player.PlayerToggleFlightEvent;
-import org.bukkit.plugin.PluginManager;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
-import org.bukkit.util.Vector;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
+
+import optic_fusion1.servercinematics.cinematic.CinematicManager;
+import optic_fusion1.servercinematics.command.CameraCommand;
+import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent;
+import optic_fusion1.servercinematics.event.PathPlaybackStartedEvent.StartCause;
+import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent;
+import optic_fusion1.servercinematics.event.PathPlaybackStoppedEvent.StopCause;
+import optic_fusion1.servercinematics.event.WaypointReachedEvent;
+import optic_fusion1.servercinematics.listener.PlayerListener;
+import optic_fusion1.servercinematics.user.User;
+import optic_fusion1.servercinematics.user.UserManager;
+import optic_fusion1.servercinematics.util.Utils;
+
 /**
  * ServerCinematics main class.
  */
-public class ServerCinematics extends JavaPlugin implements Listener, TabCompleter {
+public class ServerCinematics extends JavaPlugin {
     /**
      * A player's path is MODIFIED_PATH if the player has modified it and it hasn't been saved since.
      */
@@ -56,7 +48,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     private static final double DEFSPEED = 5.0;
     private static final int CALCPOINTS = 20;
     private static long pbid = 0;
-    private File paths;
+    private File paths = new File(getDataFolder(), "paths");
     private boolean shortPrefix = false;
     private boolean finalWaypointTeleport = true;
     // player info
@@ -111,55 +103,50 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     private static final List<Player> TEMP_JOINS = new ArrayList<>();
 
     private static final UserManager USER_MANAGER = new UserManager();
-    private static final PluginManager PLUGIN_MANAGER = Bukkit.getPluginManager();
     private boolean isInGlobalMode;
+
+    private final CinematicManager cinematicManager = new CinematicManager();
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
-        registerListeners();
-        createFolders();
-        initializeVariables();
-        registerCommand();
-    }
+        this.saveDefaultConfig();
+        this.paths.mkdirs();
 
-    private void initializeVariables() {
+        this.registerCommandSafely("camera", new CameraCommand(this));
+
+        Bukkit.getPluginManager().registerEvents(new PlayerListener(this), this);
+
         this.shortPrefix = getConfig().getBoolean("short-prefix", false);
         this.finalWaypointTeleport = getConfig().getBoolean("final-waypoint-teleport", true);
     }
 
-    private void createFolders() {
-        File dataFolder = getDataFolder();
-        if (!dataFolder.isDirectory()) {
-            dataFolder.mkdir();
+    @Override
+    public void onDisable() {
+        this.cinematicManager.clearCinematics(); // TODO: Write cinematics to file
+    }
+
+    private void registerCommandSafely(String commandName, CommandExecutor executor) {
+        PluginCommand pluginCommand = getCommand(commandName);
+        if (pluginCommand == null) {
+            return;
         }
-        File paths = new File(dataFolder, "paths");
-        if (!paths.isDirectory()) {
-            paths.mkdir();
+
+        pluginCommand.setExecutor(executor);
+
+        if (executor instanceof TabCompleter tabCompleter) {
+            pluginCommand.setTabCompleter(tabCompleter);
         }
-        this.paths = paths;
     }
 
-    private void registerCommand() {
-        PluginCommand pluginCommand = getCommand("camera");
-        CameraCommand cameraCommand = new CameraCommand(this);
-        pluginCommand.setExecutor(cameraCommand);
-        pluginCommand.setTabCompleter(cameraCommand);
+    public CinematicManager getCinematicManager() {
+        return cinematicManager;
     }
 
-    private void registerListeners() {
-        registerListener(new PlayerListener(this));
-        PLUGIN_MANAGER.registerEvents(this, this);
-    }
-
-    private void registerListener(Listener listener) {
-        PLUGIN_MANAGER.registerEvents(listener, this);
-    }
     /**
      * Loads and starts to play a path for a specific player. If the player has a path they are editing, the path will be overwritten.
      * If you want to avoid this, you can store the current player path for later by using savePlayerPath().
      * If already playing a path, throws an exception.
-     * 
+     *
      * @param player
      * @param path
      * @param speed The speed to play at.
@@ -186,19 +173,19 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         } else if (j > 0) {
             pl_playing.put(player.getUniqueId(), false);
             pl_looping.put(player.getUniqueId(), false);
-            this.speed.put(player.getUniqueId(), speed);
+            ServerCinematics.speed.put(player.getUniqueId(), speed);
             teleport.put(player.getUniqueId(), tpmode);
-            this.pathless.put(player.getUniqueId(), pathless);
+            ServerCinematics.pathless.put(player.getUniqueId(), pathless);
             return play(player, null, true, StartCause.PLUGIN);
         }
         return 0;
     }
-    
+
     /**
      * Starts to play a path for a specific player. If the player has a path they are editing, the path will be overwritten.
      * If you want to avoid this, you can store the current player path for later by using savePlayerPath().
      * If already playing a path, throws an exception.
-     * 
+     *
      * @param player
      * @param path The path as a CinematicPath.
      * @param speed The speed to play at.
@@ -218,17 +205,17 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             throw new IllegalArgumentException("player already playing");
         }
         deserializePath(player, path);
-        if (this.waypoints.get(player.getUniqueId()).size() < 1) {
+        if (ServerCinematics.waypoints.get(player.getUniqueId()).size() < 1) {
             return 0;
         }
         teleport.put(player.getUniqueId(), tpmode);
-        this.pathless.put(player.getUniqueId(), pathless);
-        this.speed.put(player.getUniqueId(), speed);
+        ServerCinematics.pathless.put(player.getUniqueId(), pathless);
+        ServerCinematics.speed.put(player.getUniqueId(), speed);
         pl_playing.put(player.getUniqueId(), false);
         pl_looping.put(player.getUniqueId(), false);
         return play(player, null, true, StartCause.PLUGIN);
     }
-    
+
     @Deprecated
     public long startPath(Player player, String path, boolean tpmode, boolean pathless) throws Exception {
         return startPath(player, path, speed.get(player.getUniqueId()), tpmode, pathless);
@@ -238,10 +225,10 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     public long startPath(Player player, CinematicPath path, boolean tpmode, boolean pathless) {
         return startPath(player, path, speed.get(player.getUniqueId()), tpmode, pathless);
     }
-    
+
     /**
      * Saves the current path used by the player. Designed to only be used around paths played by the plugin if it isn't obvious to the player that they should save first. Needs to be called before playing paths.
-     * 
+     *
      * @param player The player to save the path of.
      * @return A SavedPlayerPath that can be given to restorePlayerPath().
      */
@@ -249,7 +236,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         if (player == null) {
             throw new IllegalArgumentException("player cannot be null");
         }
-        
+
         UUID u = player.getUniqueId();
         return new SavedPlayerPath(u,
                                    teleport.get(u),
@@ -268,10 +255,10 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                    waypoints_f.get(u),
                                    waypoints_t.get(u));
     }
-    
+
     /**
      * Restores a previously saved path by the player. Designed to only be used around paths played by the plugin if it isn't obvious to the player that they should save first.
-     * 
+     *
      * @param player The player to restore the path to.
      * @param path A SavedPlayerPath that is to be restored.
      */
@@ -279,7 +266,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         if (player == null) {
             throw new IllegalArgumentException("player cannot be null");
         }
-        
+
         UUID pathOwnerUUID = path.getOwner();
         if (player.getUniqueId() != pathOwnerUUID) {
             throw new IllegalArgumentException("Trying to restore path to different player");
@@ -304,7 +291,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
 
     /**
      * Pauses the playback for a specific player.
-     * 
+     *
      * @param player The player whose playback is to be paused.
      */
     public void pausePath(Player player) {
@@ -315,10 +302,10 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             paused.put(player.getUniqueId(), true);
         }
     }
-    
+
     /**
      * Resumes the playback for a specific player.
-     * 
+     *
      * @param player The player whose playback is to be resumed from a pause.
      */
     public void resumePath(Player player) {
@@ -329,10 +316,10 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             paused.put(player.getUniqueId(), false);
         }
     }
-    
+
     /**
      * Stops playing the path for a player.
-     * 
+     *
      * @param player
      */
     public void stopPath(Player player) {
@@ -370,7 +357,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         final UUID uniqueId = player.getUniqueId();
         return playWithFakeUUID(player, commandSender, uniqueId, is_fplay, cause);
     }
-    
+
     // not necessarily fake UUID despite the misleading name
     private long playWithFakeUUID(final Player player, final CommandSender commandSender, final UUID uniqueId, final boolean is_fplay, final StartCause cause) {
         if (getSafeWaypoints(uniqueId).size() <= 0 && commandSender != null) {
@@ -383,42 +370,42 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         }
         pbids.put(uniqueId, id);
         if (!isInGlobalMode) {
-            this.old_af.put(uniqueId, player.getAllowFlight());
-            this.old_f.put(uniqueId, player.isFlying());
-            this.old_gm.put(uniqueId, player.getGameMode());
-            this.old_loc.put(uniqueId, player.getLocation());
-            this.old_fsp.put(uniqueId, player.getFlySpeed());
+            ServerCinematics.old_af.put(uniqueId, player.getAllowFlight());
+            ServerCinematics.old_f.put(uniqueId, player.isFlying());
+            ServerCinematics.old_gm.put(uniqueId, player.getGameMode());
+            ServerCinematics.old_loc.put(uniqueId, player.getLocation());
+            ServerCinematics.old_fsp.put(uniqueId, player.getFlySpeed());
             player.setFlySpeed(0.0f);
         }
-        this.playing.put(uniqueId, true);
+        ServerCinematics.playing.put(uniqueId, true);
         final int tid = this.timer_id++;
-        this.timer_ids.put(uniqueId, tid);
-        if (!this.speed.containsKey(uniqueId)) {
-            this.speed.put(uniqueId, 5.0);
+        ServerCinematics.timer_ids.put(uniqueId, tid);
+        if (!ServerCinematics.speed.containsKey(uniqueId)) {
+            ServerCinematics.speed.put(uniqueId, DEFSPEED);
         }
-        this.speed_a.put(uniqueId, this.speed.get(uniqueId));
+        ServerCinematics.speed_a.put(uniqueId, ServerCinematics.speed.get(uniqueId));
         User user = getUserManager().getUser(player.getUniqueId());
-        PathPlaybackStartedEvent evt = new PathPlaybackStartedEvent(cause, player, user.getPathName(), id);
+        PathPlaybackStartedEvent evt = new PathPlaybackStartedEvent(cause, player, user.getCurrentPath(), id);
         getServer().getPluginManager().callEvent(evt);
         new BukkitRunnable() {
             CommandSender owner = commandSender;
             Player p = player;
             UUID u = uniqueId;
             // path info: locations, speeds, yaws, pitches, messages, flags, delays, instant toggles
-            List<Location> w = new ArrayList<Location>(getSafeWaypoints(this.u));
-            List<Double> ws = new ArrayList<Double>(getSafeWaypointSpeeds(this.u));
-            List<Double> wy = new ArrayList<Double>(getSafeWaypointYaw(this.u));
-            List<Double> wp = new ArrayList<Double>(getSafeWaypointPitch(this.u));
-            List<String> wmsg = new ArrayList<String>(getSafeWaypointMessages(this.u));
-            List<Integer> wl = new ArrayList<Integer>(waypointOptions.get(this.u));
-            List<Double> wd = new ArrayList<Double>(waypointDelays.get(this.u));
-            List<Boolean> wi = new ArrayList<Boolean>(waypoints_i.get(this.u));
-            List<Integer> windx = new ArrayList<Integer>();
-            List<Boolean> wtemp = new ArrayList<Boolean>();
+            List<Location> w = new ArrayList<>(getSafeWaypoints(this.u));
+            List<Double> ws = new ArrayList<>(getSafeWaypointSpeeds(this.u));
+            List<Double> wy = new ArrayList<>(getSafeWaypointYaw(this.u));
+            List<Double> wp = new ArrayList<>(getSafeWaypointPitch(this.u));
+            List<String> wmsg = new ArrayList<>(getSafeWaypointMessages(this.u));
+            List<Integer> wl = new ArrayList<>(waypointOptions.get(this.u));
+            List<Double> wd = new ArrayList<>(waypointDelays.get(this.u));
+            List<Boolean> wi = new ArrayList<>(waypoints_i.get(this.u));
+            List<Integer> windx = new ArrayList<>();
+            List<Boolean> wtemp = new ArrayList<>();
             // path flags
             int wf = getSafeWaypointFlags(this.u);
             // waypoint commands
-            List<List<String>> wcmd = new ArrayList<List<String>>(getSafeWaypointCommands(this.u));
+            List<List<String>> wcmd = new ArrayList<>(getSafeWaypointCommands(this.u));
             // current waypoint index
             int i = 0;
             // the ID of this path task
@@ -458,14 +445,14 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             // effective position, if not in tpmode
             Location effpos = null;
             // array of waypoints to use in instant mode
-            ArrayList<Integer> apoints = new ArrayList<Integer>();
+            ArrayList<Integer> apoints = new ArrayList<>();
             int totaldelay = 0;
             boolean initAsGlobal = isInGlobalMode;
-            
+
             private int getCurrentId() {
                 return timer_ids.get(this.u);
             }
-            
+
             private boolean isCurrent() {
                 return this.id == this.getCurrentId();
             }
@@ -477,6 +464,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                 return String.format("(%+7.3f,%+7.3f,%+7.3f)", l.getX(), l.getY(), l.getZ());
             }
             */
+            @Override
             public void run() {
                 if (this.w.size() <= 0) {
                     if (!isInGlobalMode) {
@@ -510,35 +498,36 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     this.tm = (teleport.containsKey(this.u) && teleport.get(this.u));
                     this.nopath = (pathless.containsKey(this.u) && pathless.get(this.u));
                     waypointEvent(0);
-                    
+
                     // interpolate paths
                     // creates a whole bunch of intermediate points that are never visible to the player
-                    
+
                     if (isInGlobalMode || !hasCache(this.p) || nopath) {
                         if (pl_playing.get(u) && owner != null) {
                             owner.sendMessage(Utils.colorize((shortPrefix ? "&7[&8&l[**]<|&7]" : "&7[&7&l[**]<|&eServer&6Cinematics&7] &eCalculating spline, please wait...")));
                         }
                         new BukkitRunnable() {
-                            List<Location> ow = new ArrayList<Location>(w);
-                            List<Double> ows = new ArrayList<Double>(ws);
-                            List<Double> owy = new ArrayList<Double>(wy);
-                            List<Double> owp = new ArrayList<Double>(wp);
+                            List<Location> ow = new ArrayList<>(w);
+                            List<Double> ows = new ArrayList<>(ws);
+                            List<Double> owy = new ArrayList<>(wy);
+                            List<Double> owp = new ArrayList<>(wp);
 
-                            List<Location> v = new ArrayList<Location>(ow);
-                            List<Double> vs = new ArrayList<Double>(ows);
-                            List<Double> vy = new ArrayList<Double>(owy);
-                            List<Double> vp = new ArrayList<Double>(owp);
+                            List<Location> v = new ArrayList<>(ow);
+                            List<Double> vs = new ArrayList<>(ows);
+                            List<Double> vy = new ArrayList<>(owy);
+                            List<Double> vp = new ArrayList<>(owp);
 
-                            List<String> vm = new ArrayList<String>(wmsg);
-                            List<List<String>> vc = new ArrayList<List<String>>(wcmd);
-                            List<Double> vd = new ArrayList<Double>(wd);
-                            List<Integer> vl = new ArrayList<Integer>(wl);
-                            List<Boolean> vi = new ArrayList<Boolean>(wi);
+                            List<String> vm = new ArrayList<>(wmsg);
+                            List<List<String>> vc = new ArrayList<>(wcmd);
+                            List<Double> vd = new ArrayList<>(wd);
+                            List<Integer> vl = new ArrayList<>(wl);
+                            List<Boolean> vi = new ArrayList<>(wi);
 
-                            List<Integer> vindx = new ArrayList<Integer>();
-                            List<Boolean> vtemp = new ArrayList<Boolean>();
+                            List<Integer> vindx = new ArrayList<>();
+                            List<Boolean> vtemp = new ArrayList<>();
                             int size = this.ow.size() - 1;
                             int[] lsz = new int[this.size];
+                            @Override
                             public void run() {
                                 for (int i = 0; i <= size; ++i) {
                                     this.vindx.add(i);
@@ -553,17 +542,17 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                         return;
                                     }
                                     final int min = Math.min(20, (int)((this.wget(n).distance(this.wget(n + 1)) - 1.0) * 2.0));
-                                    final boolean isInstant = tm && this.vi.get(n); 
+                                    final boolean isInstant = tm && this.vi.get(n);
                                     this.lsz[n] = min;
-                                    
+
                                     final double prevSpeed = this.ows.get(n);
                                     double prevYaw = this.owy.get(n);
                                     double prevPitch = this.owp.get(n);
-                                    
+
                                     final double nextSpeed = this.ows.get(n + 1);
                                     final double nextYaw = this.owy.get(n + 1);
                                     final double nextPitch = this.owp.get(n + 1);
-                                    
+
                                     if (improper(prevYaw) && n == 0) {
                                         prevYaw = this.ow.get(0).getYaw();
                                     }
@@ -600,7 +589,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                     if (max >= 0)
                                         apoints.add(max);
                                 }
-                                
+
                                 // add placeholder blank points
                                 if (this.vm.get(0).length() > 0 || this.vc.get(0).size() > 0 || this.vd.get(0) > 0 || (this.vl.get(0)&1)>0) {
                                     for (int i = 0; i < 2; i++) {
@@ -669,12 +658,12 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                 }
                                 return n2;
                             }
-                            
+
                             // linear interpolation
                             private double linear(final double n, final double n2, final double n3) {
                                 return (1.0 - n3) * n + n3 * n2;
                             }
-                            
+
                             private Location wget(final int n) {
                                 if (n < 0) {
                                     return this.getNegativePoint(-n);
@@ -686,14 +675,14 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                     return this.ow.get(this.ow.size() - 1);
                                 }
                             }
-                            
+
                             // extrapolate a point beyond beginning of path
                             private Location getNegativePoint(final double n) {
                                 Location result = cloneLocation(this.ow.get(0)).add(cloneLocation(this.ow.get(1)).subtract(cloneLocation(this.ow.get(0))).getDirection().multiply(n));
                                 //System.out.println("neg" + n + " => " + debugFmt(result));
                                 return cloneLocation(result);
                             }
-                        }.runTaskAsynchronously(ServerCinematics.getPlugin(ServerCinematics.class));
+                        }.runTaskAsynchronously(JavaPlugin.getPlugin(ServerCinematics.class));
                     }
                     else {
                         this.w = wx.get(this.u);
@@ -802,7 +791,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     else
                         this.p.teleport(location);
                     if (this.w.size() > 1)
-                        this.dist = this.w.get(0).distance((Location)this.w.get(1));
+                        this.dist = this.w.get(0).distance(this.w.get(1));
                     else
                         this.dist = 0;
                     ++this.i;
@@ -828,8 +817,8 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                         if (this.ls == -1.0) {
                             this.ls = n;
                         }
-                        if (Math.abs(this.ls - n) > 0.5) {
-                            n = this.ls + 0.5 * Math.signum(n - this.ls);
+                        if (Math.abs(this.ls - n) > SPDLIMIT) {
+                            n = this.ls + SPDLIMIT * Math.signum(n - this.ls);
                         }
                         /*if (this.ld >= 0.0) {
                             if (this.dc && ld > this.ld) {
@@ -868,7 +857,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                     this.p.teleport(location5);
                                     // show waypoint message
                                     if (this.wmsg.get(this.i).length() > 0) {
-                                        this.p.sendMessage((String)this.wmsg.get(this.i));
+                                        this.p.sendMessage(this.wmsg.get(this.i));
                                     }
                                     // run waypoint commands
                                     for (final String wc : this.wcmd.get(this.i)) {
@@ -876,14 +865,14 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                             this.p.chat("/" + wc.substring(1));
                                         }
                                         else {
-                                            Bukkit.dispatchCommand((CommandSender)Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
+                                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
                                         }
                                     }
                                 } else {
                                     for (Player ps: getServer().getOnlinePlayers()) {
                                         // show waypoint message
                                         if (this.wmsg.get(this.i).length() > 0) {
-                                            ps.sendMessage((String)this.wmsg.get(this.i));
+                                            ps.sendMessage(this.wmsg.get(this.i));
                                         }
                                         ps.teleport(location5);
                                         // run waypoint commands
@@ -892,7 +881,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                                 ps.chat("/" + wc.substring(1));
                                             }
                                             else {
-                                                Bukkit.dispatchCommand((CommandSender)Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
+                                                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
                                             }
                                         }
                                     }
@@ -942,10 +931,10 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                             // show message
                             if (this.wmsg.get(this.i).length() > 0) {
                                 if (!isInGlobalMode)
-                                    this.p.sendMessage((String)this.wmsg.get(this.i));
+                                    this.p.sendMessage(this.wmsg.get(this.i));
                                 else
                                     for (Player ps: getServer().getOnlinePlayers()) {
-                                        ps.sendMessage((String)this.wmsg.get(this.i));
+                                        ps.sendMessage(this.wmsg.get(this.i));
                                     }
                             }
                             // run commands
@@ -955,7 +944,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                         this.p.chat("/" + wc.substring(1));
                                     }
                                     else {
-                                        Bukkit.dispatchCommand((CommandSender)Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
+                                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), wc.replace("%player%", this.p.getName()));
                                     }
                                 }
                             else
@@ -965,7 +954,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                             ps.chat("/" + wc.substring(1));
                                         }
                                         else {
-                                            Bukkit.dispatchCommand((CommandSender)Bukkit.getConsoleSender(), wc.replace("%player%", ps.getName()));
+                                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), wc.replace("%player%", ps.getName()));
                                         }
                                     }
                                 }
@@ -985,7 +974,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                             if (remainingWaypoints < 15) {
                                 double totalDist = 0;
                                 for (int j = i; j < w.size() - 1; ++j) {
-                                    totalDist += w.get(j).distance(w.get(j + 1)); 
+                                    totalDist += w.get(j).distance(w.get(j + 1));
                                 }
                                 totalDist += effpos.distance(w.get(i));
                                 int ticksLeft = (int)Math.ceil(totalDist / n);
@@ -1031,9 +1020,9 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                                             this.cancel();
                                             return;
                                         }
-                                        try { 
-                                            ps.teleport(p); 
-                                        } catch (Exception ex) { 
+                                        try {
+                                            ps.teleport(p);
+                                        } catch (Exception ex) {
                                             this.cancel();
                                             return;
                                         }
@@ -1044,7 +1033,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                         }
                         if (this.tm) { // tpmode
                             final Location location4 = this.p.getLocation();
-                            this.q = (-(location4.distance((Location)this.w.get(this.i)) - margin) + this.dist) / this.dist;
+                            this.q = (-(location4.distance(this.w.get(this.i)) - margin) + this.dist) / this.dist;
                             //this.q = (this.dist - location4.distance(location2)) / this.dist;
                             this.q = Math.min(1, Math.max(0, this.q));
                             if (this.yaw) {
@@ -1117,11 +1106,11 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                 Vector vm = v.normalize();
                 return vm.dot(dest.toVector()) - vm.dot(p.toVector());
             }
-            
+
             // do waypoint reached event
             private void waypointEvent(int i) {
                 if (i >= 0) {
-                    WaypointReachedEvent evt = new WaypointReachedEvent(p, user.getPathName(), i, waypoints.get(p.getUniqueId()).size());
+                    WaypointReachedEvent evt = new WaypointReachedEvent(p, user.getCurrentPath(), i, waypoints.get(p.getUniqueId()).size());
                     getServer().getPluginManager().callEvent(evt);
                 }
             }
@@ -1137,7 +1126,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                 }
                 return o;
             }
-            
+
 /*
             private double optimal(final double n, final double n2) {
                 return optimalRaw(n + 180, n2 + 180);
@@ -1153,7 +1142,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         }.runTaskTimer(this, 1L, 1L);
         return id;
     }
-    
+
     protected Location cloneLocation(Location location) {
         return new Location(location.getWorld(), location.getX(), location.getY(), location.getZ(), location.getYaw(), location.getPitch());
     }
@@ -1172,177 +1161,177 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         }
         return v - 90.0;
     }
-    
+
     protected String fts(final double n) {
         return Double.toString(Math.floor(n * 1000.0) / 1000.0);
     }
-    
+
     private boolean isFalse(final Boolean b) {
         return !this.isTrue(b);
     }
-    
+
     private boolean isTrue(final Boolean b) {
         return b != null && b;
     }
-    
+
     private List<Location> getSafeWaypoints(final Player player) {
-        if (this.waypoints.get(player.getUniqueId()) == null) {
-            this.waypoints.put(player.getUniqueId(), new ArrayList<Location>());
+        if (ServerCinematics.waypoints.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints.put(player.getUniqueId(), new ArrayList<Location>());
         }
-        return this.waypoints.get(player.getUniqueId());
+        return ServerCinematics.waypoints.get(player.getUniqueId());
     }
-    
+
     public List<Location> getSafeWaypoints(final CommandSender commandSender) {
         return this.getSafeWaypoints((Player)commandSender);
     }
-    
+
     private List<Double> getSafeWaypointSpeeds(final Player player) {
-        if (this.waypoints_s.get(player.getUniqueId()) == null) {
-            this.waypoints_s.put(player.getUniqueId(), new ArrayList<Double>());
+        if (ServerCinematics.waypoints_s.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_s.put(player.getUniqueId(), new ArrayList<Double>());
         }
-        return this.waypoints_s.get(player.getUniqueId());
-    }
-    
-    private List<Double> getSafeWaypointPitch(final Player player) {
-        if (this.waypoints_p.get(player.getUniqueId()) == null) {
-            this.waypoints_p.put(player.getUniqueId(), new ArrayList<Double>());
-        }
-        return this.waypoints_p.get(player.getUniqueId());
-    }
-    
-    private List<Double> getSafeWaypointYaw(final Player player) {
-        if (this.waypoints_y.get(player.getUniqueId()) == null) {
-            this.waypoints_y.put(player.getUniqueId(), new ArrayList<Double>());
-        }
-        return this.waypoints_y.get(player.getUniqueId());
-    }
-    
-    private List<String> getSafeWaypointMessages(final Player player) {
-        if (this.waypoints_m.get(player.getUniqueId()) == null) {
-            this.waypoints_m.put(player.getUniqueId(), new ArrayList<String>());
-        }
-        return this.waypoints_m.get(player.getUniqueId());
-    }
-    
-    private List<List<String>> getSafeWaypointCommands(final Player player) {
-        if (this.waypoints_c.get(player.getUniqueId()) == null) {
-            this.waypoints_c.put(player.getUniqueId(), new ArrayList<List<String>>());
-        }
-        return this.waypoints_c.get(player.getUniqueId());
-    }
-    
-    public List<Double> getSafeWaypointDelays(final Player player) {
-        if (this.waypointDelays.get(player.getUniqueId()) == null) {
-            this.waypointDelays.put(player.getUniqueId(), new ArrayList<Double>());
-        }
-        return this.waypointDelays.get(player.getUniqueId());
-    }
-    
-    public List<Integer> getSafeWaypointOptions(final Player player) {
-        if (this.waypointOptions.get(player.getUniqueId()) == null) {
-            this.waypointOptions.put(player.getUniqueId(), new ArrayList<Integer>());
-        }
-        return this.waypointOptions.get(player.getUniqueId());
-    }
-    
-    public List<Boolean> getSafeWaypointInstants(final Player player) {
-        if (this.waypoints_i.get(player.getUniqueId()) == null) {
-            this.waypoints_i.put(player.getUniqueId(), new ArrayList<Boolean>());
-        }
-        return this.waypoints_i.get(player.getUniqueId());
-    }
-    
-    private int getSafeWaypointFlags(final Player player) {
-        if (!this.waypoints_f.containsKey(player.getUniqueId())) {
-            this.waypoints_f.put(player.getUniqueId(), 0);
-        }
-        return this.waypoints_f.get(player.getUniqueId());
+        return ServerCinematics.waypoints_s.get(player.getUniqueId());
     }
 
-    
+    private List<Double> getSafeWaypointPitch(final Player player) {
+        if (ServerCinematics.waypoints_p.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_p.put(player.getUniqueId(), new ArrayList<Double>());
+        }
+        return ServerCinematics.waypoints_p.get(player.getUniqueId());
+    }
+
+    private List<Double> getSafeWaypointYaw(final Player player) {
+        if (ServerCinematics.waypoints_y.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_y.put(player.getUniqueId(), new ArrayList<Double>());
+        }
+        return ServerCinematics.waypoints_y.get(player.getUniqueId());
+    }
+
+    private List<String> getSafeWaypointMessages(final Player player) {
+        if (ServerCinematics.waypoints_m.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_m.put(player.getUniqueId(), new ArrayList<String>());
+        }
+        return ServerCinematics.waypoints_m.get(player.getUniqueId());
+    }
+
+    private List<List<String>> getSafeWaypointCommands(final Player player) {
+        if (ServerCinematics.waypoints_c.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_c.put(player.getUniqueId(), new ArrayList<List<String>>());
+        }
+        return ServerCinematics.waypoints_c.get(player.getUniqueId());
+    }
+
+    public List<Double> getSafeWaypointDelays(final Player player) {
+        if (ServerCinematics.waypointDelays.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypointDelays.put(player.getUniqueId(), new ArrayList<Double>());
+        }
+        return ServerCinematics.waypointDelays.get(player.getUniqueId());
+    }
+
+    public List<Integer> getSafeWaypointOptions(final Player player) {
+        if (ServerCinematics.waypointOptions.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypointOptions.put(player.getUniqueId(), new ArrayList<Integer>());
+        }
+        return ServerCinematics.waypointOptions.get(player.getUniqueId());
+    }
+
+    public List<Boolean> getSafeWaypointInstants(final Player player) {
+        if (ServerCinematics.waypoints_i.get(player.getUniqueId()) == null) {
+            ServerCinematics.waypoints_i.put(player.getUniqueId(), new ArrayList<Boolean>());
+        }
+        return ServerCinematics.waypoints_i.get(player.getUniqueId());
+    }
+
+    private int getSafeWaypointFlags(final Player player) {
+        if (!ServerCinematics.waypoints_f.containsKey(player.getUniqueId())) {
+            ServerCinematics.waypoints_f.put(player.getUniqueId(), 0);
+        }
+        return ServerCinematics.waypoints_f.get(player.getUniqueId());
+    }
+
+
     private List<Location> getSafeWaypoints(final UUID u) {
-        if (this.waypoints.get(u) == null) {
-            this.waypoints.put(u, new ArrayList<Location>());
+        if (ServerCinematics.waypoints.get(u) == null) {
+            ServerCinematics.waypoints.put(u, new ArrayList<Location>());
         }
-        return this.waypoints.get(u);
+        return ServerCinematics.waypoints.get(u);
     }
-    
+
     private List<Double> getSafeWaypointSpeeds(final UUID u) {
-        if (this.waypoints_s.get(u) == null) {
-            this.waypoints_s.put(u, new ArrayList<Double>());
+        if (ServerCinematics.waypoints_s.get(u) == null) {
+            ServerCinematics.waypoints_s.put(u, new ArrayList<Double>());
         }
-        return this.waypoints_s.get(u);
+        return ServerCinematics.waypoints_s.get(u);
     }
-    
+
     private List<Double> getSafeWaypointPitch(final UUID u) {
-        if (this.waypoints_p.get(u) == null) {
-            this.waypoints_p.put(u, new ArrayList<Double>());
+        if (ServerCinematics.waypoints_p.get(u) == null) {
+            ServerCinematics.waypoints_p.put(u, new ArrayList<Double>());
         }
-        return this.waypoints_p.get(u);
+        return ServerCinematics.waypoints_p.get(u);
     }
-    
+
     private List<Double> getSafeWaypointYaw(final UUID u) {
-        if (this.waypoints_y.get(u) == null) {
-            this.waypoints_y.put(u, new ArrayList<Double>());
+        if (ServerCinematics.waypoints_y.get(u) == null) {
+            ServerCinematics.waypoints_y.put(u, new ArrayList<Double>());
         }
-        return this.waypoints_y.get(u);
+        return ServerCinematics.waypoints_y.get(u);
     }
-    
+
     private List<String> getSafeWaypointMessages(final UUID u) {
-        if (this.waypoints_m.get(u) == null) {
-            this.waypoints_m.put(u, new ArrayList<String>());
+        if (ServerCinematics.waypoints_m.get(u) == null) {
+            ServerCinematics.waypoints_m.put(u, new ArrayList<String>());
         }
-        return this.waypoints_m.get(u);
+        return ServerCinematics.waypoints_m.get(u);
     }
-    
+
     private List<List<String>> getSafeWaypointCommands(final UUID u) {
-        if (this.waypoints_c.get(u) == null) {
-            this.waypoints_c.put(u, new ArrayList<List<String>>());
+        if (ServerCinematics.waypoints_c.get(u) == null) {
+            ServerCinematics.waypoints_c.put(u, new ArrayList<List<String>>());
         }
-        return this.waypoints_c.get(u);
+        return ServerCinematics.waypoints_c.get(u);
     }
-    
+
     /*private ArrayList<Double> getSafeWaypointDelays(final UUID u) {
         if (this.waypointDelays.get(u) == null) {
             this.waypointDelays.put(u, new ArrayList<Double>());
         }
         return this.waypointDelays.get(u);
     }
-    
+
     private ArrayList<Integer> getSafeWaypointOptions(final UUID u) {
         if (this.waypointOptions.get(u) == null) {
             this.waypointOptions.put(u, new ArrayList<Integer>());
         }
         return this.waypointOptions.get(u);
     }*/
-    
+
     private int getSafeWaypointFlags(final UUID u) {
-        if (!this.waypoints_f.containsKey(u)) {
-            this.waypoints_f.put(u, 0);
+        if (!ServerCinematics.waypoints_f.containsKey(u)) {
+            ServerCinematics.waypoints_f.put(u, 0);
         }
-        return this.waypoints_f.get(u);
+        return ServerCinematics.waypoints_f.get(u);
     }
-    
+
     private List<Double> getSafeWaypointSpeeds(final CommandSender commandSender) {
         return this.getSafeWaypointSpeeds((Player)commandSender);
     }
-    
+
     public List<Double> getSafeWaypointPitch(final CommandSender commandSender) {
         return this.getSafeWaypointPitch((Player)commandSender);
     }
-    
+
     public List<Double> getSafeWaypointYaw(final CommandSender commandSender) {
         return this.getSafeWaypointYaw((Player)commandSender);
     }
-    
+
     private List<String> getSafeWaypointMessages(final CommandSender commandSender) {
         return this.getSafeWaypointMessages((Player)commandSender);
     }
-    
+
     private List<List<String>> getSafeWaypointCommands(final CommandSender commandSender) {
         return this.getSafeWaypointCommands((Player)commandSender);
     }
-    
+
     private List<Integer> getSafeWaypointOptions(final CommandSender commandSender) {
         return this.getSafeWaypointOptions((Player)commandSender);
     }
@@ -1350,41 +1339,41 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     private List<Boolean> getSafeWaypointInstants(CommandSender commandSender) {
         return this.getSafeWaypointInstants((Player)commandSender);
     }
-    
+
     private List<Double> getSafeWaypointDelays(final CommandSender commandSender) {
         return this.getSafeWaypointDelays((Player)commandSender);
     }
-    
+
     private void clearCache(final Player player) {
-        this.wm.put(player.getUniqueId(), false);
-        this.waypoints_t.put(player.getUniqueId(), -1.0);
+        ServerCinematics.wm.put(player.getUniqueId(), false);
+        ServerCinematics.waypoints_t.put(player.getUniqueId(), -1.0);
     }
-    
+
     private void clearPathName(final Player player) {
-        this.pathnames.put(player.getUniqueId(), MODIFIED_PATH);
+        ServerCinematics.pathnames.put(player.getUniqueId(), MODIFIED_PATH);
     }
-    
+
     private boolean hasCache(final Player player) {
         return this.getCache(player) != null && this.getIsCacheUpToDate(player);
     }
-    
+
     private boolean getIsCacheUpToDate(final Player player) {
-        final Boolean b = this.wm.get(player.getUniqueId());
+        final Boolean b = ServerCinematics.wm.get(player.getUniqueId());
         return b != null && b;
     }
-    
+
     private List<Location> getCache(final Player player) {
-        return this.wx.get(player.getUniqueId());
+        return ServerCinematics.wx.get(player.getUniqueId());
     }
-    
+
     protected String lts(final Location location) {
         return "(" + location.getBlockX() + "," + location.getBlockY() + "," + location.getBlockZ() + ")";
     }
-    
+
     protected String lts2(final Location location) {
         return "(" + this.fts(location.getX()) + "," + this.fts(location.getY()) + "," + this.fts(location.getZ()) + ")";
     }
-    
+
     // three-dimensional Catmull-Rom spline point computation
     static Location catmull_rom_3d(final double n, final Location location, final Location location2, final Location location3, final Location location4) {
         if (n > 1.0 || n < 0.0) {
@@ -1413,15 +1402,15 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         final UUID uniqueId = player.getUniqueId();
         if (noPlaylist)
             pl_playing.put(uniqueId, false);
-        boolean wasPlaying = isTrue(this.playing.get(uniqueId));
-        this.paused.put(uniqueId, false);
-        this.playing.put(uniqueId, false);
+        boolean wasPlaying = isTrue(ServerCinematics.playing.get(uniqueId));
+        ServerCinematics.paused.put(uniqueId, false);
+        ServerCinematics.playing.put(uniqueId, false);
         try {
-            player.setGameMode((GameMode)this.old_gm.get(uniqueId));
+            player.setGameMode(ServerCinematics.old_gm.get(uniqueId));
         }
         catch (Exception ex) {}
         try {
-            player.setFlySpeed((float)this.old_fsp.get(uniqueId));
+            player.setFlySpeed(ServerCinematics.old_fsp.get(uniqueId));
         }
         catch (Exception ex) {}
         if (player.getGameMode() == GameMode.SPECTATOR) {
@@ -1429,23 +1418,23 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             player.setFlying(true);
         }
         if ((this.getSafeWaypointFlags(player) & 0x1) != 0x0) {
-            player.teleport((Location)this.getSafeWaypoints(player).get(0));
+            player.teleport(this.getSafeWaypoints(player).get(0));
         }
         if ((this.getSafeWaypointFlags(player) & 0x2) != 0x0) {
-            player.teleport((Location)this.old_loc.get(uniqueId));
+            player.teleport(ServerCinematics.old_loc.get(uniqueId));
         }
         else {
             try {
-                player.setAllowFlight((boolean)this.old_af.get(uniqueId));
+                player.setAllowFlight(ServerCinematics.old_af.get(uniqueId));
             }
             catch (Exception ex2) {}
             try {
-                player.setFlying((boolean)this.old_f.get(uniqueId));
+                player.setFlying(ServerCinematics.old_f.get(uniqueId));
             }
             catch (Exception ex3) {}
         }
         if (wasPlaying) {
-            PathPlaybackStoppedEvent evt = new PathPlaybackStoppedEvent(cause, player, user.getPathName(), pbids.get(player.getUniqueId()));
+            PathPlaybackStoppedEvent evt = new PathPlaybackStoppedEvent(cause, player, user.getCurrentPath(), pbids.get(player.getUniqueId()));
             getServer().getPluginManager().callEvent(evt);
         }
         if (pl_playing.get(uniqueId)) {
@@ -1467,8 +1456,8 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     }
 
     private void stopGlobalUUID(final UUID uniqueId) {
-        this.paused.put(uniqueId, false);
-        this.playing.put(uniqueId, false);
+        ServerCinematics.paused.put(uniqueId, false);
+        ServerCinematics.playing.put(uniqueId, false);
         if (pl_playing.get(uniqueId)) {
             if (!this.findNextSuitablePath(uniqueId)) {
                 stopGlobal();
@@ -1505,7 +1494,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     continue;
                 } else
                     return false;
-            } 
+            }
             if (this.loadForPlaylist(player, list.get(check_index), true) > 0) {
                 pl_index.put(u, check_index);
                 return true;
@@ -1531,7 +1520,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     continue;
                 } else
                     return false;
-            } 
+            }
             if (this.loadForPlaylist(u, list.get(check_index)) > 0) {
                 pl_index.put(u, check_index);
                 return true;
@@ -1560,17 +1549,17 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             final String s8 = new String(Files.readAllBytes(file3.toPath()), StandardCharsets.UTF_8);
             int n11 = 0;
             this.clearCache(u);
-            this.waypoints.put(u, new ArrayList<Location>());
-            this.waypoints_s.put(u, new ArrayList<Double>());
-            this.waypoints_y.put(u, new ArrayList<Double>());
-            this.waypoints_p.put(u, new ArrayList<Double>());
-            this.waypoints_m.put(u, new ArrayList<String>());
-            this.waypoints_c.put(u, new ArrayList<List<String>>());
-            this.waypoints_f.put(u, 0);
-            this.waypoints_t.put(u, -1.0);
-            this.waypointDelays.put(u, new ArrayList<Double>());
-            this.waypointOptions.put(u, new ArrayList<Integer>());
-            this.waypoints_i.put(u, new ArrayList<Boolean>());
+            ServerCinematics.waypoints.put(u, new ArrayList<Location>());
+            ServerCinematics.waypoints_s.put(u, new ArrayList<Double>());
+            ServerCinematics.waypoints_y.put(u, new ArrayList<Double>());
+            ServerCinematics.waypoints_p.put(u, new ArrayList<Double>());
+            ServerCinematics.waypoints_m.put(u, new ArrayList<String>());
+            ServerCinematics.waypoints_c.put(u, new ArrayList<List<String>>());
+            ServerCinematics.waypoints_f.put(u, 0);
+            ServerCinematics.waypoints_t.put(u, -1.0);
+            ServerCinematics.waypointDelays.put(u, new ArrayList<Double>());
+            ServerCinematics.waypointOptions.put(u, new ArrayList<Integer>());
+            ServerCinematics.waypoints_i.put(u, new ArrayList<Boolean>());
             final List<Location> safeWaypoints7 = this.getSafeWaypoints(u);
             final List<Double> safeWaypointSpeeds7 = this.getSafeWaypointSpeeds(u);
             final List<Double> safeWaypointYaw9 = this.getSafeWaypointYaw(u);
@@ -1584,7 +1573,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             final float float4 = Float.parseFloat(s9.split(",")[3]);
             int n12 = 0;
             int safeFlags2 = 0;
-            this.pathnames.put(u, string);
+            ServerCinematics.pathnames.put(u, string);
             if (s9.split(",").length > 4) {
                 safeFlags2 = Integer.parseInt(s9.split(",")[4]);
             }
@@ -1624,20 +1613,20 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     }
                     try {
                         if (split7[2].split(";").length > 3) {
-                            this.waypoints_i.get(u).add(!split7[2].split(";")[3].equalsIgnoreCase("0"));
+                            ServerCinematics.waypoints_i.get(u).add(!split7[2].split(";")[3].equalsIgnoreCase("0"));
                         } else {
-                            this.waypoints_i.get(u).add(false);
+                            ServerCinematics.waypoints_i.get(u).add(false);
                         }
                         if (split7[2].split(";").length < 2) {
                             throw new ArrayIndexOutOfBoundsException();
                         }
                         double d = Double.parseDouble(split7[2].split(";")[1]);
                         int lf = Integer.parseInt(split7[2].split(";")[2]);
-                        this.waypointDelays.get(u).add(d);
-                        this.waypointOptions.get(u).add(lf);
+                        ServerCinematics.waypointDelays.get(u).add(d);
+                        ServerCinematics.waypointOptions.get(u).add(lf);
                     } catch (Exception ex) {
-                        this.waypointDelays.get(u).add(0.0);
-                        this.waypointOptions.get(u).add(0);
+                        ServerCinematics.waypointDelays.get(u).add(0.0);
+                        ServerCinematics.waypointOptions.get(u).add(0);
                     }
                     if (split7.length > 4) {
                         final String[] split9 = split7[4].split(":");
@@ -1676,15 +1665,15 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
                     ++n11;
                 }
             }
-            this.waypoints.put(u, safeWaypoints7);
-            this.waypoints_s.put(u, safeWaypointSpeeds7);
-            this.waypoints_y.put(u, safeWaypointYaw9);
-            this.waypoints_p.put(u, safeWaypointPitch9);
-            this.waypoints_m.put(u, safeWaypointMessages3);
-            this.waypoints_c.put(u, safeWaypointCommands3);
-            this.waypoints_f.put(u, safeFlags2);
-            this.waypoints_t.put(u, safeTime);
-            this.speed.put(u, Double.parseDouble(s9.split(",")[1]));
+            ServerCinematics.waypoints.put(u, safeWaypoints7);
+            ServerCinematics.waypoints_s.put(u, safeWaypointSpeeds7);
+            ServerCinematics.waypoints_y.put(u, safeWaypointYaw9);
+            ServerCinematics.waypoints_p.put(u, safeWaypointPitch9);
+            ServerCinematics.waypoints_m.put(u, safeWaypointMessages3);
+            ServerCinematics.waypoints_c.put(u, safeWaypointCommands3);
+            ServerCinematics.waypoints_f.put(u, safeFlags2);
+            ServerCinematics.waypoints_t.put(u, safeTime);
+            ServerCinematics.speed.put(u, Double.parseDouble(s9.split(",")[1]));
             if (safeWaypoints7.size() == 0)
                 return 0;
             lastWorld = s9.split(",")[0];
@@ -1696,18 +1685,18 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         }
     }
 
-    
+
     private void deserializePath(Player player, CinematicPath path) {
         final UUID u = player.getUniqueId();
-        this.waypoints.put(u, new ArrayList<Location>());
-        this.waypoints_s.put(u, new ArrayList<Double>());
-        this.waypoints_y.put(u, new ArrayList<Double>());
-        this.waypoints_p.put(u, new ArrayList<Double>());
-        this.waypoints_m.put(u, new ArrayList<String>());
-        this.waypoints_c.put(u, new ArrayList<List<String>>());
-        this.waypointDelays.put(u, new ArrayList<Double>());
-        this.waypointOptions.put(u, new ArrayList<Integer>());
-        this.waypoints_i.put(u, new ArrayList<Boolean>());
+        ServerCinematics.waypoints.put(u, new ArrayList<Location>());
+        ServerCinematics.waypoints_s.put(u, new ArrayList<Double>());
+        ServerCinematics.waypoints_y.put(u, new ArrayList<Double>());
+        ServerCinematics.waypoints_p.put(u, new ArrayList<Double>());
+        ServerCinematics.waypoints_m.put(u, new ArrayList<String>());
+        ServerCinematics.waypoints_c.put(u, new ArrayList<List<String>>());
+        ServerCinematics.waypointDelays.put(u, new ArrayList<Double>());
+        ServerCinematics.waypointOptions.put(u, new ArrayList<Integer>());
+        ServerCinematics.waypoints_i.put(u, new ArrayList<Boolean>());
         final List<Location> safeWaypoints7 = this.getSafeWaypoints(u);
         final List<Double> safeWaypointSpeeds7 = this.getSafeWaypointSpeeds(u);
         final List<Double> safeWaypointYaw9 = this.getSafeWaypointYaw(u);
@@ -1718,11 +1707,11 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
         final List<Integer> safeWaypointOptions = this.getSafeWaypointOptions(player);
         final List<Boolean> safeWaypointInstants = this.getSafeWaypointInstants(player);
 
-        this.waypoints_f.put(u, (path.shouldTeleportToStartAfterPlayback() ? 1 : 0)
+        ServerCinematics.waypoints_f.put(u, (path.shouldTeleportToStartAfterPlayback() ? 1 : 0)
                               | (path.shouldTeleportBackAfterPlayback() ? 2 : 0)
                               | (path.canPlayerTurnCameraDuringDelay() ? 4 : 0));
-        this.waypoints_t.put(u, -1.0);
-        
+        ServerCinematics.waypoints_t.put(u, -1.0);
+
         for (CinematicWaypoint wp: path.getWaypoints()) {
             double speed = wp.getSpeed();
             double yaw = wrapAngle(wp.getYaw());
@@ -1734,7 +1723,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             if (improper(pitch)) {
                 pitch = 444;
             }
-            
+
             safeWaypoints7.add(wp.getLocation());
             safeWaypointSpeeds7.add(speed);
             safeWaypointYaw9.add(yaw);
@@ -1746,7 +1735,7 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
             safeWaypointInstants.add(false);
         }
 
-        this.pathnames.put(u, "");
+        ServerCinematics.pathnames.put(u, "");
     }
 
     private double wrapAngle(double angle) {
@@ -1758,14 +1747,14 @@ public class ServerCinematics extends JavaPlugin implements Listener, TabComplet
     }
 
     private void clearCache(final UUID u) {
-        this.wm.put(u, false);
-        this.waypoints_t.put(u, -1.0);
+        ServerCinematics.wm.put(u, false);
+        ServerCinematics.waypoints_t.put(u, -1.0);
     }
 
     boolean improper(final double n) {
         return Math.abs(n) > 360.0 || !Double.isFinite(n);
     }
-    
+
     double properYaw(double n) {
         if (n < -180)
             n += 360;

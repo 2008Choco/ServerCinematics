@@ -4,14 +4,16 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 
+import optic_fusion1.servercinematics.cinematic.CinematicPath;
+
 public class WaypointReachedEvent extends Event {
     private static final HandlerList handlers = new HandlerList();
     private final Player player;
-    private final String path;
+    private final CinematicPath path;
     private final int waypointId;
     private final int waypointLen;
 
-    public WaypointReachedEvent(Player player, String path, int index, int length) {
+    public WaypointReachedEvent(Player player, CinematicPath path, int index, int length) {
         this.player = player;
         this.path = path;
         this.waypointId = index;
@@ -22,8 +24,8 @@ public class WaypointReachedEvent extends Event {
         return this.player;
     }
 
-    public String getPathName() {
-        return this.path;
+    public CinematicPath getPath() {
+        return path;
     }
 
     public int getWaypointIndex() {
