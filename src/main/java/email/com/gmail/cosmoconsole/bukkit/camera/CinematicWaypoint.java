@@ -9,14 +9,14 @@ import org.bukkit.Location;
  * Represents a ServerCinematics waypoint.
  */
 public class CinematicWaypoint {
-    private Location l;
-    private Double s;
-    private Double y;
-    private Double p;
-    private String m;
-    private List<String> c;
-    private double d;
-    private boolean option_0;
+    private Location loc;
+    private double speed;
+    private double yaw;
+    private double pitch;
+    private String message = "";
+    private List<String> commands = new ArrayList<>();
+    private double delay = 0;
+    private boolean isInstant;
     
     /**
      * Creates a waypoint with only a location.
@@ -24,7 +24,7 @@ public class CinematicWaypoint {
      * @param loc The location of the waypoint.
      */
     public CinematicWaypoint(Location loc) {
-        this(loc, null, null, null);
+        this(loc, -1, 444, 444);
     }
 
     /**
@@ -35,77 +35,69 @@ public class CinematicWaypoint {
      * @param yaw The yaw of the camera at the waypoint.
      * @param pitch The pitch of the camera at the waypoint.
      */
-    public CinematicWaypoint(Location loc, Double speed, Double yaw, Double pitch) {
+    public CinematicWaypoint(Location loc, double speed, double yaw, double pitch) {
         if (loc == null) {
             throw new IllegalArgumentException("location of the waypoint cannot be null");
         }
-        l = loc;
+        this.loc = loc;
         setSpeed(speed);
-        y = yaw;
-        p = pitch;
-        m = "";
-        c = new ArrayList<>();
-        d = 0;
-        option_0 = false;
+        this.yaw = yaw;
+        this.pitch = pitch;
     }
     
     public Location getLocation() {
-        return l;
+        return loc;
     }
     
-    public Double getSpeed() {
-        return s;
+    public double getSpeed() {
+        return speed;
     }
     
-    public void setSpeed(Double d) {
-        if (d == null || d.doubleValue() <= 0) {
-            s = null;
-        } else {
-            s = d;
-        }
+    public void setSpeed(double speed) {
+        this.speed = speed;
     }
     
-    public Double getYaw() {
-        return y;
+    public double getYaw() {
+        return yaw;
     }
     
-    public void setYaw(Double yaw) {
-        y = yaw;
+    public void setYaw(double yaw) {
+        this.yaw = yaw;
     }
     
-    public Double getPitch() {
-        return p;
+    public double getPitch() {
+        return pitch;
     }
     
-    public void setPitch(Double pitch) {
-        p = pitch;
+    public void setPitch(double pitch) {
+        this.pitch = pitch;
     }
     
     public String getMessage() {
-        return m;
+        return message;
     }
     
     public void setMessage(String message) {
-        m = message;
+        this.message = message;
     }
     
     public List<String> getCommands() {
-        return c;
+        return commands;
     }
     
     public double getDelay() {
-        return d;
+        return delay;
     }
     
     public void setDelay(double delay) {
-        d = Math.max(0, delay);
+        this.delay = Math.max(0, delay);
     }
     
     public boolean isInstant() {
-        return option_0;
+        return isInstant;
     }
     
     public void setIsInstant(boolean instant) {
-        option_0 = instant;
+        isInstant = instant;
     }
 }

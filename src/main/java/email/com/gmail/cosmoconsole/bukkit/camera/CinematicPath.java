@@ -7,45 +7,40 @@ import java.util.List;
  * Represents a ServerCinematics path.
  */
 public class CinematicPath {
-    private List<CinematicWaypoint> p;
-    private boolean flag_0;
-    private boolean flag_1;
-    private boolean flag_2;
-    
-    public CinematicPath() {
-        p = new ArrayList<>();
-        flag_0 = flag_1 = flag_2 = false;
-    }
-    
+    private List<CinematicWaypoint> waypoints = new ArrayList<>();
+    private boolean shouldTeleportToStartAfterPlayback;
+    private boolean shouldTeleportBackAfterPlayback;
+    private boolean canPlayerTurnCameraDuringDelay;
+
     public List<CinematicWaypoint> getWaypoints() {
-        return p;
+        return waypoints;
     }
     
     public void addWaypoint(CinematicWaypoint waypoint) {
-        p.add(waypoint);
+        waypoints.add(waypoint);
     }
     
     public boolean shouldTeleportToStartAfterPlayback() {
-        return flag_0;
+        return shouldTeleportToStartAfterPlayback;
     }
     
     public void setShouldTeleportToStartAfterPlayback(boolean state) {
-        flag_0 = state;
+        shouldTeleportToStartAfterPlayback = state;
     }
     
     public boolean shouldTeleportBackAfterPlayback() {
-        return flag_1;
+        return shouldTeleportBackAfterPlayback;
     }
     
     public void setShouldTeleportBackAfterPlayback(boolean state) {
-        flag_1 = state;
+        shouldTeleportBackAfterPlayback = state;
     }
     
     public boolean canPlayerTurnCameraDuringDelay() {
-        return flag_2;
+        return canPlayerTurnCameraDuringDelay;
     }
     
     public void setCanPlayerTurnCameraDuringDelay(boolean state) {
-        flag_2 = state;
+        canPlayerTurnCameraDuringDelay = state;
     }
 }
